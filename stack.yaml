@@ -1,0 +1,10 @@
+resolver: lts-7.13
+
+packages:
+- '.'
+- '../rumpus/submodules/linear-extra'
+- '../rumpus/submodules/lens-extra'
+- '../rumpus/submodules/gl-pal'
+- '../rumpus/submodules/halive'
+- '../sdl-pal'
+- '../nanovg-hs'
