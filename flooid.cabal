@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 executable flooid
   hs-source-dirs:      app
   main-is:             Main.hs
-  other-modules:       
+  other-modules:       Quad
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:       base
                      , text
