@@ -36,7 +36,7 @@ kViewportWidth          = 1024*2
 kViewportHeight         = 768*2
 kGridWidth              = kViewportWidth / 2
 kGridHeight             = kViewportHeight / 2
-kSplatRadius            = kGridWidth / 8
+kSplatRadius            = kGridWidth / 32
 
 kAmbientTemperature     = 0
 kImpulseTemperature     = 10
@@ -179,7 +179,7 @@ createSurfaces w h = do
     sDensity     <- createSlab w h 1
     sPressure    <- createSlab w h 1
     sTemperature <- createSlab w h 1
-    -- Ref never changes, but gives us a more uniform treatment
+    -- These refs never change, but gives us a more uniform treatment
     sDivergence  <- newIORef =<< createSurface w h 3
     sObstacles   <- newIORef =<< createSurface w h 3
 
@@ -226,7 +226,7 @@ main = do
         -- winSize  <- getWindowSizeV2 win
         -- mouseLoc <- getMouseLocationV2
 
-        fluidUpdate
+        fluidUpdate win
         fluidRender
 
         glSwapWindow win
@@ -235,8 +235,8 @@ pong slabRef = slbPong <$> liftIO (readIORef slabRef)
 ping slabRef = slbPing <$> liftIO (readIORef slabRef)
 boop surfaceRef = liftIO (readIORef surfaceRef)
 
-fluidUpdate :: (MonadIO m, MonadReader FluidData m) => m ()
-fluidUpdate = do
+fluidUpdate :: (MonadIO m, MonadReader FluidData m) => Window -> m ()
+fluidUpdate win = do
     FluidSurfaces{..} <- asks fdSurfaces
 
     glViewport 0 0 (floor kGridWidth) (floor kGridHeight)
@@ -253,8 +253,13 @@ fluidUpdate = do
     applyBuoyancy (ping sVelocity) (ping sTemperature) (ping sDensity) (pong sVelocity)
     swapSurfaces sVelocity
 
-    applyImpulse (ping sTemperature) kImpulsePosition kImpulseTemperature
-    applyImpulse (ping sDensity) kImpulsePosition kImpulseDensity
+    mouseLoc <- getMouseLocationV2
+    winSize  <- getWindowSizeV2 win
+
+    let impulsePosition = (mouseLoc / winSize) * V2 kGridWidth kGridHeight
+            & _y %~ (kGridHeight -)
+    applyImpulse (ping sTemperature) impulsePosition kImpulseTemperature
+    applyImpulse (ping sDensity) impulsePosition kImpulseDensity
 
     computeDivergence (ping sVelocity) (boop sObstacles) (boop sDivergence)
     clearSurface (ping sPressure) 0
