@@ -32,8 +32,8 @@ import Data.IORef
 import Quad
 
 kCellSize               = 1.25
-kViewportWidth          = 1024
-kViewportHeight         = 768
+kViewportWidth          = 1024*2
+kViewportHeight         = 768*2
 kGridWidth              = kViewportWidth / 2
 kGridHeight             = kViewportHeight / 2
 kSplatRadius            = kGridWidth / 8
@@ -42,7 +42,7 @@ kAmbientTemperature     = 0
 kImpulseTemperature     = 10
 kImpulseDensity         = 1
 kNumJacobiIterations    = 40
-kTimeStep               = 0
+kTimeStep               = 0.1
 kSmokeBuoyancy          = 1
 kSmokeWeight            = 0.05
 kGradientScale          = 1 / kCellSize
@@ -151,16 +151,7 @@ swapSurfaces slabRef = liftIO $
     modifyIORef' slabRef $ \Slab{..} ->
         Slab { slbPing = slbPong, slbPong = slbPing }
 
-createFluidStorage w h = do
-    sVelocity    <- createSlab w h 2
-    sDensity     <- createSlab w h 1
-    sPressure    <- createSlab w h 1
-    sTemperature <- createSlab w h 1
-    -- Ref never changes, but gives us a more uniform treatment
-    sDivergence  <- newIORef =<< createSurface w h 3
-    sObstacles   <- newIORef =<< createSurface w h 3
 
-    return FluidSurfaces{..}
 
 data FluidSurfaces = FluidSurfaces
     { sVelocity    :: IORef Slab
@@ -182,6 +173,19 @@ data FluidPrograms = FluidPrograms
     }
 
 data FluidData = FluidData { fdPrograms :: FluidPrograms, fdSurfaces :: FluidSurfaces }
+
+createSurfaces w h = do
+    sVelocity    <- createSlab w h 2
+    sDensity     <- createSlab w h 1
+    sPressure    <- createSlab w h 1
+    sTemperature <- createSlab w h 1
+    -- Ref never changes, but gives us a more uniform treatment
+    sDivergence  <- newIORef =<< createSurface w h 3
+    sObstacles   <- newIORef =<< createSurface w h 3
+
+    clearSurface (ping sTemperature) kAmbientTemperature
+
+    return FluidSurfaces{..}
 
 createShaders = do
     addShaderIncludeDir "resources"
@@ -208,11 +212,8 @@ main = do
     (quadVAO, quadVertCount) <- makeScreenSpaceQuad
     glBindVertexArray (unVertexArrayObject quadVAO)
 
-    let (fbW, fbH) = (200, 200)
-    (framebuffer, framebufferTexture) <- createFramebuffer fbW fbH
-
     programs <- createShaders
-    surfaces <- createFluidStorage (floor kGridWidth) (floor kGridHeight)
+    surfaces <- createSurfaces (floor kGridWidth) (floor kGridHeight)
     let fluidData = FluidData { fdPrograms = programs, fdSurfaces = surfaces }
     void . flip runReaderT fluidData . whileWindow win $ \_events -> do
         V2 winFbW winFbH <- fmap fromIntegral <$> glGetDrawableSize win
@@ -236,9 +237,9 @@ boop surfaceRef = liftIO (readIORef surfaceRef)
 
 fluidUpdate :: (MonadIO m, MonadReader FluidData m) => m ()
 fluidUpdate = do
-    glViewport 0 0 (floor kGridWidth) (floor kGridHeight)
-
     FluidSurfaces{..} <- asks fdSurfaces
+
+    glViewport 0 0 (floor kGridWidth) (floor kGridHeight)
 
     advect (ping sVelocity) (ping sVelocity) (boop sObstacles) (pong sVelocity) kVelocityDissipation
     swapSurfaces sVelocity
