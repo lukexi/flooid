@@ -57,6 +57,10 @@ kPositionSlot           = 0
 type Transform = M44 GLfloat
 type TextureIDRaw = GLint
 
+data ObstaclesU = ObstaclesU
+    { uTime    :: UniformLocation GLfloat
+    } deriving Data
+
 data AdvectU = AdvectU
     { uVelocity    :: UniformLocation TextureIDRaw
     , uSource      :: UniformLocation TextureIDRaw
@@ -170,6 +174,7 @@ data FluidPrograms = FluidPrograms
     , pSplat             :: (Program, SplatU)
     , pSubtractGradient  :: (Program, SubtractGradientU)
     , pVisualize         :: (Program, VisualizeU)
+    , pObstacles         :: (Program, ObstaclesU)
     }
 
 data FluidData = FluidData { fdPrograms :: FluidPrograms, fdSurfaces :: FluidSurfaces }
@@ -197,6 +202,7 @@ createShaders = do
     pSplat             <- makeFluidShader "splat"
     pSubtractGradient  <- makeFluidShader "subtract-gradient"
     pVisualize         <- makeFluidShader "visualize"
+    pObstacles         <- makeFluidShader "obstacles"
 
     return FluidPrograms{..}
 
@@ -204,6 +210,7 @@ main :: IO ()
 main = do
 
     win <- reacquire 0 $ createGLWindow "flooid"
+    windowSize win $= V2 1024 768
 
     swapInterval $= SynchronizedUpdates
 
@@ -235,11 +242,15 @@ pong slabRef = slbPong <$> liftIO (readIORef slabRef)
 ping slabRef = slbPing <$> liftIO (readIORef slabRef)
 boop surfaceRef = liftIO (readIORef surfaceRef)
 
+
+
 fluidUpdate :: (MonadIO m, MonadReader FluidData m) => Window -> m ()
 fluidUpdate win = do
     FluidSurfaces{..} <- asks fdSurfaces
 
     glViewport 0 0 (floor kGridWidth) (floor kGridHeight)
+
+    obstacles (boop sObstacles)    
 
     advect (ping sVelocity) (ping sVelocity) (boop sObstacles) (pong sVelocity) kVelocityDissipation
     swapSurfaces sVelocity
@@ -327,6 +338,17 @@ resetState = do
     glActiveTexture GL_TEXTURE0 >> glBindTexture GL_TEXTURE_2D 0
     glBindFramebuffer GL_FRAMEBUFFER 0
     glDisable GL_BLEND
+
+obstacles dest = do
+    (p, ObstaclesU{..}) <- asks (pObstacles . fdPrograms)
+    useProgram p
+
+    uniformF uTime =<< realToFrac . utctDayTime <$> liftIO getCurrentTime
+
+    bindSurfaceDest dest
+    glDrawArrays GL_TRIANGLE_STRIP 0 4
+    resetState
+
 
 advect velocity source obstacles dest dissipation = do
 
