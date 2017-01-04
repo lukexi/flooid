@@ -41,9 +41,11 @@ kSplatRadius            = kGridWidth / 32
 kAmbientTemperature     = 0
 kImpulseTemperature     = 10
 kImpulseDensity         = 1
+-- kImpulseDensity         = 10
 kNumJacobiIterations    = 40
 kTimeStep               = 0.1
 kSmokeBuoyancy          = 1
+-- kSmokeBuoyancy          = 5
 kSmokeWeight            = 0.05
 kGradientScale          = 1 / kCellSize
 kTemperatureDissipation = 0.99
@@ -108,9 +110,10 @@ data SubtractGradientU = SubtractGradientU
     } deriving Data
 
 data VisualizeU = VisualizeU
-    { uSampler   :: UniformLocation TextureIDRaw
-    , uFillColor :: UniformLocation (V3 GLfloat)
-    , uScale     :: UniformLocation (V2 GLfloat)
+    { uSampler    :: UniformLocation TextureIDRaw
+    , uFillColor  :: UniformLocation (V3 GLfloat)
+    , uScale      :: UniformLocation (V2 GLfloat)
+    , uIsVelocity :: UniformLocation GLint
     } deriving Data
 
 makeFluidShader name = do
@@ -120,7 +123,6 @@ makeFluidShader name = do
     shader <- createShaderProgramInclude
         vertPath fragPath ["/resources"]
 
-    useProgram shader
     uniforms <- acquireUniforms shader
     
     return (shader, uniforms)
@@ -220,7 +222,8 @@ main = do
     glBindVertexArray (unVertexArrayObject quadVAO)
 
     programs <- createShaders
-    surfaces <- createSurfaces (floor kGridWidth) (floor kGridHeight)
+    surfaces <- reacquire 1 $ createSurfaces (floor kGridWidth) (floor kGridHeight)
+
     let fluidData = FluidData { fdPrograms = programs, fdSurfaces = surfaces }
     void . flip runReaderT fluidData . whileWindow win $ \_events -> do
         V2 winFbW winFbH <- fmap fromIntegral <$> glGetDrawableSize win
@@ -307,8 +310,12 @@ fluidRender = do
 
     -- Draw ink:
     bindSurfaceSource GL_TEXTURE0 (ping sDensity)
+    -- bindSurfaceSource GL_TEXTURE0 (ping sTemperature)
+    -- bindSurfaceSource GL_TEXTURE0 (ping sPressure)
+    -- bindSurfaceSource GL_TEXTURE0 (ping sVelocity) >> uniformI uIsVelocity 1
+
     uniformV3 uFillColor (V3 1 1 1)
-    uniformV2 uScale  (V2 (1 / kViewportWidth) (1 / kViewportHeight))
+    uniformV2 uScale  (1 / V2 kViewportWidth kViewportHeight)
     glDrawArrays GL_TRIANGLE_STRIP 0 4
     
     -- Draw obstacles:

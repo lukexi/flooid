@@ -21,8 +21,11 @@ void main()
 	float d = rect(vUV - vec2(0.5, 0.5), vec2(0.1, 0.08));
 
 	d = min(d, circle(vUV - vec2(0.8, 0.8), 0.1));
-
-	vec4 color = vec4(1.0, 0.0, 0.0, 1.0);
+	
+	// Encode velocity into G&B channels.
+	vec2 velocity = vec2(0,0);
+	
+	vec4 color = vec4(1.0, velocity.x, velocity.y, 1.0);
     FragColor = mix
         ( color
         , vec4(0, 0, 0, 0) // transparent
