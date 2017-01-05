@@ -40,12 +40,12 @@ kSplatRadius            = kGridWidth / 32
 
 kAmbientTemperature     = 0
 kImpulseTemperature     = 10
-kImpulseDensity         = 1
--- kImpulseDensity         = 10
+-- kImpulseDensity         = 1
+kImpulseDensity         = 10
 kNumJacobiIterations    = 40
 kTimeStep               = 0.1
-kSmokeBuoyancy          = 1
--- kSmokeBuoyancy          = 5
+-- kSmokeBuoyancy          = 1
+kSmokeBuoyancy          = 5
 kSmokeWeight            = 0.05
 kGradientScale          = 1 / kCellSize
 kTemperatureDissipation = 0.99
@@ -226,17 +226,20 @@ main = do
 
     let fluidData = FluidData { fdPrograms = programs, fdSurfaces = surfaces }
     void . flip runReaderT fluidData . whileWindow win $ \_events -> do
+        -- now      <- realToFrac . utctDayTime <$> getCurrentTime
         V2 winFbW winFbH <- fmap fromIntegral <$> glGetDrawableSize win
         glViewport 0 0 winFbW winFbH
 
         glClearColor 0.1 0 0.1 1
         glClear (GL_COLOR_BUFFER_BIT .|. GL_DEPTH_BUFFER_BIT)
 
-        -- now      <- realToFrac . utctDayTime <$> getCurrentTime
-        -- winSize  <- getWindowSizeV2 win
-        -- mouseLoc <- getMouseLocationV2
+        mouseLoc <- getMouseLocationV2
+        winSize  <- getWindowSizeV2 win
 
-        fluidUpdate win
+        let impulsePosition = (mouseLoc / winSize) * V2 kGridWidth kGridHeight
+                & _y %~ (kGridHeight -)
+
+        fluidUpdate impulsePosition
         fluidRender
 
         glSwapWindow win
@@ -247,8 +250,8 @@ boop surfaceRef = liftIO (readIORef surfaceRef)
 
 
 
-fluidUpdate :: (MonadIO m, MonadReader FluidData m) => Window -> m ()
-fluidUpdate win = do
+fluidUpdate :: (MonadIO m, MonadReader FluidData m) => V2 GLfloat -> m ()
+fluidUpdate impulsePosition = do
     FluidSurfaces{..} <- asks fdSurfaces
 
     glViewport 0 0 (floor kGridWidth) (floor kGridHeight)
@@ -267,11 +270,7 @@ fluidUpdate win = do
     applyBuoyancy (ping sVelocity) (ping sTemperature) (ping sDensity) (pong sVelocity)
     swapSurfaces sVelocity
 
-    mouseLoc <- getMouseLocationV2
-    winSize  <- getWindowSizeV2 win
-
-    let impulsePosition = (mouseLoc / winSize) * V2 kGridWidth kGridHeight
-            & _y %~ (kGridHeight -)
+    
     applyImpulse (ping sTemperature) impulsePosition kImpulseTemperature
     applyImpulse (ping sDensity) impulsePosition kImpulseDensity
 

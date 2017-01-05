@@ -21,7 +21,7 @@ void main()
         FragColor = vec4(uFillColor, L);
 
         // Hue cycling color
-        // vec3 col = hsv2rgb_smooth( vec3(L, 0.8, 0.9)  );
-        // FragColor = vec4(col, L);
+        vec3 col = hsv2rgb_smooth( vec3(L, 0.8, 0.9)  );
+        FragColor = vec4(col, L);
     }
 }
